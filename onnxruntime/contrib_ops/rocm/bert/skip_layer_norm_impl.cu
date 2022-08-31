@@ -39,6 +39,7 @@ namespace contrib {
 namespace rocm {
 
 template <typename T>
+
 Status LaunchSkipLayerNormKernel(
     hipStream_t stream, T* output, const T* input, const T* skip, const T* gamma,
     const T* beta, const T* bias, float epsilon, const int ld, const int element_count) {
