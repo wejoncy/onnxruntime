@@ -42,7 +42,7 @@ template <typename T>
 Status LaunchSkipLayerNormKernel(
     hipStream_t stream, T* output, const T* input, const T* skip, const T* gamma,
     const T* beta, const T* bias, float epsilon, const int ld, const int element_count) {
-  // this must be true because n is the total size of the tensor
+  // this must be true because element_count is the total size of the tensor
   assert(element_count % ld == 0);
   bool hasBias = (bias == nullptr) ? false : true;
   if (0 == (ld % 4)) {
