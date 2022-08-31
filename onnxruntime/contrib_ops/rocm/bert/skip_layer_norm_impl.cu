@@ -117,12 +117,3 @@ template Status LaunchSkipLayerNormKernel<float>(hipStream_t stream, float* outp
                                                  const float* skip, const float* gamma, const float* beta,
                                                  const float* bias, float epsilon, int ld,
                                                  int element_count, bool tuning);
-
-template Status LaunchSkipLayerNormKernel<half>(hipStream_t stream, half* output, const half* input,
-                                                const half* skip, const half* gamma, const half* beta,
-                                                const half* bias, float epsilon, int ld,
-                                                int element_count, bool tuning);
-
-}  // namespace rocm
-}  // namespace contrib
-}  // namespace onnxruntime
