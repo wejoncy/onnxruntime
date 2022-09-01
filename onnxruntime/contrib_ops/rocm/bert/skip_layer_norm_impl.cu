@@ -33,6 +33,7 @@ limitations under the License.
 #include <hip/hip_fp16.h>
 
 #include "contrib_ops/rocm/bert/skip_layer_norm_impl_kernel.h"
+#include "contrib_ops/rocm/bert/skip_layer_norm_tunable_op.h"
 
 namespace onnxruntime {
 namespace contrib {
@@ -45,6 +46,15 @@ Status LaunchSkipLayerNormKernel(
     const T* beta, const T* bias, float epsilon, const int ld, const int element_count) {
   // this must be true because element_count is the total size of the tensor
   assert(element_count % ld == 0);
+
+  if (tuning) {
+    static SkipLayerNormTunableOp<T> op;
+    op.EnableTuning();
+
+    SkipLayerNormParams<T> op_params(stream, output, input, skip, gamma, beta, bias, epsilon, ld, element_count);
+    return op(&op_params);
+  }
+
   bool hasBias = (bias == nullptr) ? false : true;
   if (0 == (ld % 4)) {
     const int grid_size = element_count / ld;
