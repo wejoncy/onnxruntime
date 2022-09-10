@@ -1,3 +1,8 @@
+- name: PublishingNuget
+  displayName: Publishing Nuget Packages and report binary size to mysql
+  type: boolean
+  default: true
+
 jobs:
 - job: Publish_NuGet_Package_And_Report
   workspace:
@@ -6,7 +11,7 @@ jobs:
   - name: GDN_CODESIGN_TARGETDIRECTORY
     value: '$(Build.BinariesDirectory)/nuget-artifact/final-package'
   pool: 'Win-CPU-2021'
-  condition: and (succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  #condition: and (succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   dependsOn:
   - NuGet_Test_Win_CPU
   - NuGet_Test_Linux_CPU
