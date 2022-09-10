@@ -79,6 +79,12 @@ jobs:
       buildVersionToDownload: specific
       pipelineId: 227683
 
+  - task: CmdLine@2
+    displayName: 'Post binary sizes to the dashboard database using command line'
+    inputs:
+      script: |
+        dir $(Build.BinariesDirectory)/nuget-artifact/final-package
+
   - task: NuGetCommand@2
     displayName: 'Copy Signed Native NuGet Package to ORT-NIGHTLY'
     condition: ne(variables['IsReleaseBuild'], 'true') # release build has a different package naming scheme
