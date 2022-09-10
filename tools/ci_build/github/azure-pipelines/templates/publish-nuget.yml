@@ -13,11 +13,6 @@ jobs:
     value: '$(Build.BinariesDirectory)/nuget-artifact/final-package'
   pool: 'Win-CPU-2021'
   #condition: and (succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  dependsOn:
-  - NuGet_Test_Win_CPU
-  - NuGet_Test_Linux_CPU
-  - NuGet_Test_MacOS
-  - NuGet_Packaging_DML
   steps:
   - checkout: self
     submodules: false
@@ -28,6 +23,11 @@ jobs:
     inputs:
       artifactName: 'drop-signed-nuget-CPU'
       targetPath: $(Build.BinariesDirectory)/nuget-artifact/final-package
+      buildType: specific
+      project: '530acbc4-21bc-487d-8cd8-348ff451d2ff'
+      definition: 940
+      buildVersionToDownload: specific
+      pipelineId: 227683
 
   - template: ../nuget/templates/get-nuget-package-version-as-variable.yml
     parameters:
@@ -73,7 +73,11 @@ jobs:
     inputs:
       artifactName: 'drop-signed-nuget-dml'
       targetPath: $(Build.BinariesDirectory)/nuget-artifact/final-package
-
+      buildType: specific
+      project: '530acbc4-21bc-487d-8cd8-348ff451d2ff'
+      definition: 940
+      buildVersionToDownload: specific
+      pipelineId: 227683
 
   - task: NuGetCommand@2
     displayName: 'Copy Signed Native NuGet Package to ORT-NIGHTLY'
