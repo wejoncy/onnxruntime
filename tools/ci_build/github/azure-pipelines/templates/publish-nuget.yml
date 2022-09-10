@@ -83,7 +83,7 @@ jobs:
     displayName: 'Post binary sizes to the dashboard database using command line'
     inputs:
       script: |
-        dir $(Build.BinariesDirectory)/nuget-artifact/final-package
+        dir $(Build.BinariesDirectory)\nuget-artifact\final-package
 
   - task: NuGetCommand@2
     displayName: 'Copy Signed Native NuGet Package to ORT-NIGHTLY'
