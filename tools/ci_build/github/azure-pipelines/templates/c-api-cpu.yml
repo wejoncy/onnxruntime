@@ -850,6 +850,7 @@ jobs:
   - NuGet_Test_Win_CPU
   - NuGet_Test_Linux_CPU
   - NuGet_Test_MacOS
+  - NuGet_Packaging_DML
   steps:
   - checkout: self
     submodules: false
