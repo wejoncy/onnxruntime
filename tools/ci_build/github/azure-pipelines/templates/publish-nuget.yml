@@ -1,3 +1,4 @@
+parameters:
 - name: PublishingNuget
   displayName: Publishing Nuget Packages and report binary size to mysql
   type: boolean
