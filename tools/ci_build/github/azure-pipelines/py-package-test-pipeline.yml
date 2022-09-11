@@ -11,7 +11,7 @@ jobs:
   - task: DownloadPipelineArtifact@2
     displayName: 'Download Pipeline Artifact'
     inputs:
-      buildType: 'current'
+      #buildType: 'current'
       artifactName: 'drop-linux-cpu-x86_64'
       targetPath: '$(Build.BinariesDirectory)/Release'
       buildType: specific
@@ -23,7 +23,7 @@ jobs:
   - task: DownloadPipelineArtifact@2
     displayName: 'Download Pipeline Artifact'
     inputs:
-      buildType: 'current'
+      #buildType: 'current'
       artifactName: 'onnxruntime'
       targetPath: '$(Build.BinariesDirectory)/whl'
       buildType: specific
