@@ -1,5 +1,5 @@
 parameters:
-- name: build_py_parameters  
+- name: build_py_parameters
   type: string
   default: ''
 
@@ -9,11 +9,14 @@ jobs:
   workspace:
     clean: all
   pool: 'aiinfra-linux-ARM64-CPU-2019'
+  variables:
+    # The build machine pool doesn't have dotnet, so it can't run CG.
+    skipComponentGovernanceDetection: true
   steps:
     - checkout: self
       clean: true
       submodules: recursive
-    
+
     - template: set-nightly-build-option-variable-step.yml
 
     - template: get-docker-image-steps.yml
@@ -38,15 +41,11 @@ jobs:
               -e NIGHTLY_BUILD \
               -e BUILD_BUILDNUMBER \
               onnxruntimecpubuilpythonarm64 /bin/bash tools/ci_build/github/linux/build_linux_arm64_python_package.sh
-                
+
     - task: PublishBuildArtifacts@1
       displayName: 'Publish Artifact: ONNXRuntime python wheel'
       inputs:
         PathtoPublish: '$(Build.BinariesDirectory)/dist'
         ArtifactName: onnxruntime
-
-    - template: component-governance-component-detection-steps.yml
-      parameters:
-        condition: 'succeeded'
 
     - template: clean-agent-build-directory-step.yml
