@@ -28,7 +28,7 @@ jobs:
       parameters:
         Dockerfile: tools/ci_build/github/linux/docker/inference/x64/python/cpu/Dockerfile.manylinux2014_cpu
         Context: tools/ci_build/github/linux/docker/inference/x64/python/cpu
-        DockerBuildArgs: "--build-arg BUILD_UID=$( id -u ) --build-arg BASEIMAGE=${{ parameters.arch }} --build-arg PLATFORM=${{ parameters.arch }}"
+        DockerBuildArgs: "--build-arg BUILD_UID=$( id -u ) --build-arg BASEIMAGE=${{ parameters.base_image }} --build-arg PLATFORM=${{ parameters.arch }}"
         Repository: onnxruntimecpubuilpython${{ parameters.arch }}
 
     - task: CmdLine@2
