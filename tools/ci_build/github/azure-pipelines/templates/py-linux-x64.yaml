@@ -1,5 +1,5 @@
 jobs:
-- job: Linux_py_Wheels
+- job: Linux_py_Wheels_x86_64
   timeoutInMinutes: 240
   workspace:
     clean: all
