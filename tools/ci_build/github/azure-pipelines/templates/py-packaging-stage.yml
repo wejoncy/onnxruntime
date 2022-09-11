@@ -816,7 +816,15 @@ stages:
           condition: 'succeeded'
 
   - ${{ if eq(parameters.enable_linux_arm, true) }}:
-      - template: py-linux-arm.yaml
+      - template: py-linux.yml
+        parameters:
+          arch: 'aarch64'
+          machine_pool: 'aiinfra-linux-ARM64-CPU-2019'
+          base_image: 'arm64v8/centos:7'
 
   - ${{ if eq(parameters.enable_linux_cpu, true) }}:
-      - template: py-linux-x64.yaml
+      - template: py-linux.yml
+        parameters:
+          arch: 'x86_64'
+          machine_pool: 'Linux-CPU'
+          base_image: 'centos:7'

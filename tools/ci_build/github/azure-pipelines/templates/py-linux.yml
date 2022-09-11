@@ -1,9 +1,19 @@
+parameters:
+- name: arch
+  type: string
+
+- name: machine_pool
+  type: string
+  
+- name: base_image
+  type: string
+
 jobs:
-- job: Linux_py_Wheels_x86_64
+- job: Linux_py_Wheels_${{ parameters.arch }}
   timeoutInMinutes: 240
   workspace:
     clean: all
-  pool: 'Linux-CPU'
+  pool: ${{ parameters.machine_pool }}
   variables:
     # The build machine pool doesn't have dotnet, so it can't run CG.
     skipComponentGovernanceDetection: true
@@ -18,8 +28,8 @@ jobs:
       parameters:
         Dockerfile: tools/ci_build/github/linux/docker/inference/x64/python/cpu/Dockerfile.manylinux2014_cpu
         Context: tools/ci_build/github/linux/docker/inference/x64/python/cpu
-        DockerBuildArgs: "--build-arg BUILD_UID=$( id -u ) --build-arg BASEIMAGE=centos:7 --build-arg PLATFORM=x86_64"
-        Repository: onnxruntimecpubuilpythonx86_64
+        DockerBuildArgs: "--build-arg BUILD_UID=$( id -u ) --build-arg BASEIMAGE=${{ parameters.arch }} --build-arg PLATFORM=${{ parameters.arch }}"
+        Repository: onnxruntimecpubuilpython${{ parameters.arch }}
 
     - task: CmdLine@2
       displayName: 'Build Python Wheel'
@@ -35,7 +45,7 @@ jobs:
               -w /onnxruntime_src \
               -e NIGHTLY_BUILD \
               -e BUILD_BUILDNUMBER \
-              onnxruntimecpubuilpythonx86_64 /bin/bash tools/ci_build/github/linux/build_linux_arm64_python_package.sh
+              onnxruntimecpubuilpython${{ parameters.arch }} /bin/bash tools/ci_build/github/linux/build_linux_arm64_python_package.sh
 
     - task: PublishBuildArtifacts@1
       displayName: 'Publish Artifact: ONNXRuntime python wheel'
