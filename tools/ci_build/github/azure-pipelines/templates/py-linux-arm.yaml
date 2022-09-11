@@ -1,8 +1,3 @@
-parameters:
-- name: build_py_parameters
-  type: string
-  default: ''
-
 jobs:
 - job: Linux_py_Wheels
   timeoutInMinutes: 240
@@ -48,4 +43,7 @@ jobs:
         PathtoPublish: '$(Build.BinariesDirectory)/dist'
         ArtifactName: onnxruntime
 
-    - template: clean-agent-build-directory-step.yml
+
+    - task: mspremier.PostBuildCleanup.PostBuildCleanup-task.PostBuildCleanup@3
+      displayName: 'Clean Agent Directories'
+      condition: always()
