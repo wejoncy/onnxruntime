@@ -59,7 +59,6 @@ jobs:
               --build_dir $(Build.BinariesDirectory) \
               --config Release --test \
               --skip_submodule_sync \
-              --build_shared_lib \
               --parallel \
               --build_wheel \
               --enable_onnx_tests \
