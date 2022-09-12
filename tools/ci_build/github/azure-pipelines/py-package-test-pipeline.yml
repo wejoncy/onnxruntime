@@ -49,7 +49,7 @@ jobs:
   - task: PowerShell@2
     displayName: 'Add Build Tag'
     #Run this step only if all previous steps are succeeded and (this build was triggered by a resource trigger or it was triggered by another build).
-    condition: and(succeeded(), eq(variables['Build.Reason'], 'ResourceTrigger')
+    condition: and(succeeded(), eq(variables['Build.Reason'], 'ResourceTrigger'))
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     inputs:
