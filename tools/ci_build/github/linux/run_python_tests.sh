@@ -2,7 +2,7 @@
 set -e -x
 
 cd $BUILD_BINARIESDIRECTORY
-files=(onnxruntime/*.whl)
+files=(whl/*.whl)
 FILE_NAME="${files[0]}"
 FILE_NAME=$(basename $FILE_NAME)
 PYTHON_PACKAGE_NAME=$(echo "$FILE_NAME" | cut -f 1 -d '-')
