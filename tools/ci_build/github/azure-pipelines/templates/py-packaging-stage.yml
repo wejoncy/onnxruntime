@@ -826,5 +826,5 @@ stages:
       - template: py-linux.yml
         parameters:
           arch: 'x86_64'
-          machine_pool: 'Linux-CPU'
+          machine_pool: 'Azure-Pipelines-EO-Ubuntu-2004-aiinfra'
           base_image: 'centos:7'
