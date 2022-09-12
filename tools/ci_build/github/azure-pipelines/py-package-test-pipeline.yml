@@ -23,20 +23,20 @@ jobs:
       buildType: specific
       project: '530acbc4-21bc-487d-8cd8-348ff451d2ff'
       definition: 841
-      buildVersionToDownload: specific
-      pipelineId: 227749
+      #buildVersionToDownload: specific
+      #pipelineId: 227749
     
   - task: DownloadPipelineArtifact@2
     displayName: 'Download Pipeline Artifact'
     inputs:
-      #buildType: 'current'
+      preferTriggeringPipeline: true
       artifactName: 'onnxruntime'
       targetPath: '$(Build.BinariesDirectory)/whl'
       buildType: specific
       project: '530acbc4-21bc-487d-8cd8-348ff451d2ff'
       definition: 841
-      buildVersionToDownload: specific
-      pipelineId: 227749
+      #buildVersionToDownload: specific
+      #pipelineId: 227749
 
 
   - task: Bash@3
@@ -45,4 +45,22 @@ jobs:
       targetType: filePath
       filePath: tools/ci_build/github/linux/run_python_tests.sh
 
-  - template: templates/clean-agent-build-directory-step.yml
+
+  - task: PowerShell@2
+    displayName: 'Add Build Tag'
+    #Run this step only if all previous steps are succeeded and (this build was triggered by a resource trigger or it was triggered by another build).
+    condition: and(succeeded(), eq(variables['Build.Reason'], 'ResourceTrigger')
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    inputs:
+      targetType: inline
+      script: |
+        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+        $headers.Add("Authorization", "Bearer $env:SYSTEM_ACCESSTOKEN")
+        $headers.Add("Content-Type", "application/json")
+        $uri = "https://dev.azure.com/aiinfra/Lotus/_apis/build/builds/$(Build.TriggeredBy.BuildId)/tags/test%20pass?api-version=6.0"
+        Invoke-RestMethod -Uri $uri -Headers $headers -Method PUT
+
+  - task: mspremier.PostBuildCleanup.PostBuildCleanup-task.PostBuildCleanup@3
+    displayName: 'Clean Agent Directories'
+    condition: always()
