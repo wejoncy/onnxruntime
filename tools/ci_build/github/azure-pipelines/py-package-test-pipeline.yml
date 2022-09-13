@@ -26,7 +26,7 @@ jobs:
         $headers.Add("Authorization", "Bearer $env:SYSTEM_ACCESSTOKEN")
         $headers.Add("Content-Type", "application/json")
         $uri = "https://dev.azure.com/aiinfra/Lotus/_apis/build/builds/$($env:BUILD_TRIGGEREDBY_BUILDID)/tags/test%20pass?api-version=6.0"
-        Write-Host "$url"
+        Write-Host "##vso[task.logissue type=warning]$uri"
         Invoke-RestMethod -Uri $uri -Headers $headers -Method PUT
 
   - task: mspremier.PostBuildCleanup.PostBuildCleanup-task.PostBuildCleanup@3
