@@ -32,6 +32,7 @@ jobs:
       preferTriggeringPipeline: true
       artifactName: 'onnxruntime'
       targetPath: '$(Build.BinariesDirectory)/whl'
+      runVersion: 'latest'
       buildType: specific
       project: '530acbc4-21bc-487d-8cd8-348ff451d2ff'
       definition: 841
