@@ -31,13 +31,13 @@ class DeepSpeedZeROModifier(FP16OptimizerModifier):
         import deepspeed
 
         ds_version = LooseVersion(deepspeed.__version__)
-        if ds_version > LooseVersion("0.6.5") or ds_version < LooseVersion("0.4.0"):
+        if ds_version > LooseVersion("0.7.1") or ds_version < LooseVersion("0.4.0"):
             warnings.warn("Skip modifying optimizer because of unsupported DeepSpeed version.", UserWarning)
             return False
 
         return self.check_requirements(
             ["has_overflow_serial", "get_grad_norm_direct", "has_overflow_partitioned_grads_serial"],
-            require_apex=True,
+            require_apex=False,
             require_torch_non_finite_check=True,
         )
 
@@ -45,7 +45,7 @@ class DeepSpeedZeROModifier(FP16OptimizerModifier):
         warnings.warn("DeepSpeed fp16_optimizer functions are overrided with faster implementation.", UserWarning)
 
         def get_grad_norm_direct(target, gradients, params, norm_type=2):
-            import amp_C
+            from onnxruntime.training.ortmodule.torch_cpp_extensions import fused_ops
 
             def is_model_parallel_parameter(p):
                 return hasattr(p, "model_parallel") and p.model_parallel
@@ -93,7 +93,10 @@ class DeepSpeedZeROModifier(FP16OptimizerModifier):
                     # Multi-tensor applier takes a function and a list of list
                     # and performs the operation on that list all in one kernel.
                     grad_norm, _ = multi_tensor_applier(
-                        amp_C.multi_tensor_l2norm, dummy_overflow_buf, [grads_for_norm], False  # no per-parameter norm
+                        fused_ops.multi_tensor_l2norm,
+                        dummy_overflow_buf,
+                        [fused_ops.TorchTensorVector(grads_for_norm)],
+                        False,  # no per-parameter norm
                     )
                     # Since we will be summing across data parallel groups,
                     # we need the pow(norm-type).

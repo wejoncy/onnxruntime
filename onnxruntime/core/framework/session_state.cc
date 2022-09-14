@@ -195,7 +195,7 @@ Status SessionState::CreateKernels(const KernelRegistryManager& kernel_registry_
   return Status::OK();
 }
 
-const SequentialExecutionPlan* SessionState::GetExecutionPlan() const { 
+const SequentialExecutionPlan* SessionState::GetExecutionPlan() const {
   if (!p_seq_exec_plan_.has_value()) {
     return nullptr;
   }
@@ -679,7 +679,6 @@ const MemoryPatternGroup* SessionState::GetMemoryPatternGroup(
     gsl::span<const OrtValue> tensor_inputs,
     gsl::span<const int> feed_mlvalue_idxs,
     const InlinedHashMap<int, TensorShape>*& out_inferred_shapes) const {
-
   out_inferred_shapes = nullptr;
   int64_t key = CalculateMemoryPatternsKey(tensor_inputs);
   std::lock_guard<OrtMutex> lock(mem_patterns_lock_);
@@ -707,7 +706,6 @@ const MemoryPatternGroup* SessionState::GetMemoryPatternGroup(
   }
   return &it->second;
 }
-
 
 void SessionState::ResolveMemoryPatternFlag() {
   if (enable_mem_pattern_) {
@@ -1139,9 +1137,11 @@ static void ComputeConstantInitializerUseCount(const Graph& graph, InlinedHashMa
 }
 
 using NodePlacementMap = std::unordered_map<std::string, std::vector<std::string>>;
+using NodePlacementSet = std::unordered_set<std::string>;
 
 static Status VerifyEachNodeIsAssignedToAnEpImpl(const Graph& graph, bool is_verbose,
-                                                 NodePlacementMap& node_placements) {
+                                                 NodePlacementMap& node_placements,
+                                                 NodePlacementSet& node_placement_provider_set) {
   for (const auto& node : graph.Nodes()) {
     const auto& node_provider = node.GetExecutionProviderType();
     if (node_provider.empty()) {
@@ -1149,6 +1149,8 @@ static Status VerifyEachNodeIsAssignedToAnEpImpl(const Graph& graph, bool is_ver
                              "Could not find an implementation for ",
                              node.OpType(), "(", node.SinceVersion(), ") node with name '", node.Name(), "'");
     }
+
+    node_placement_provider_set.insert(node_provider);
 
 #if !defined(ORT_MINIMAL_BUILD)
     if (is_verbose) {  // TODO: should we disable this if the number of nodes is above a certain threshold?
@@ -1161,7 +1163,8 @@ static Status VerifyEachNodeIsAssignedToAnEpImpl(const Graph& graph, bool is_ver
     if (node.ContainsSubgraph()) {
       const auto subgraphs = node.GetSubgraphs();
       for (const auto& subgraph : subgraphs) {
-        ORT_RETURN_IF_ERROR(VerifyEachNodeIsAssignedToAnEpImpl(*subgraph, is_verbose, node_placements));
+        ORT_RETURN_IF_ERROR(VerifyEachNodeIsAssignedToAnEpImpl(*subgraph, is_verbose, node_placements,
+                                                               node_placement_provider_set));
       }
     }
   }
@@ -1169,8 +1172,10 @@ static Status VerifyEachNodeIsAssignedToAnEpImpl(const Graph& graph, bool is_ver
   return Status::OK();
 }
 
-static Status VerifyEachNodeIsAssignedToAnEp(const Graph& graph, const logging::Logger& logger) {
+static Status VerifyEachNodeIsAssignedToAnEp(const Graph& graph, const logging::Logger& logger,
+                                             const ExecutionProviders& providers) {
   NodePlacementMap node_placements{};
+  NodePlacementSet node_placement_provider_set{};
 #if !defined(ORT_MINIMAL_BUILD)
   const bool is_verbose_mode = logger.GetSeverity() == logging::Severity::kVERBOSE;
 #else
@@ -1178,24 +1183,36 @@ static Status VerifyEachNodeIsAssignedToAnEp(const Graph& graph, const logging::
   const bool is_verbose_mode = false;
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
-  ORT_RETURN_IF_ERROR(VerifyEachNodeIsAssignedToAnEpImpl(graph, is_verbose_mode, node_placements));
+  ORT_RETURN_IF_ERROR(VerifyEachNodeIsAssignedToAnEpImpl(graph, is_verbose_mode, node_placements, node_placement_provider_set));
 
 #if !defined(ORT_MINIMAL_BUILD)
   // print placement info
   if (is_verbose_mode) {
     LOGS(logger, VERBOSE) << "Node placements";
     if (node_placements.size() == 1) {
-      LOGS(logger, VERBOSE) << "All nodes have been placed on [" << node_placements.begin()->first << "].";
+      const auto& [provider, node_strs] = *node_placements.begin();
+      LOGS(logger, VERBOSE) << " All nodes placed on [" << provider << "]. Number of nodes: " << node_strs.size();
     } else {
       for (const auto& [provider, node_strs] : node_placements) {
-        std::ostringstream all_nodes_str;
-        std::copy(node_strs.begin(), node_strs.end(), std::ostream_iterator<std::string>(all_nodes_str, ", "));
-        LOGS(logger, VERBOSE) << " Provider: [" << provider << "]"
-                              << ": [" << all_nodes_str.str() << "]";
+        LOGS(logger, VERBOSE) << " Node(s) placed on [" << provider << "]. Number of nodes: " << node_strs.size();
+        for (const auto& node_str : node_strs) {
+          LOGS(logger, VERBOSE) << "  " << node_str;
+        }
       }
     }
   }
 #endif  // !defined(ORT_MINIMAL_BUILD)
+
+  // Silent fallback from GPU/NPU to CPU nodes can cause performance issues due to memory copies and frequent stalls.
+  // If the user explicitly included the CPU provider anyway, then remain silent, but if it was implicitly added,
+  // and unexpected fallback happened to a non-preferred provider, warn the user.
+  size_t explicit_provider_count = providers.NumProviders() - (providers.GetCpuProviderWasImplicitlyAdded() ? 1 : 0);
+  if (node_placement_provider_set.size() > explicit_provider_count) {
+    LOGS(logger, WARNING) << "Some nodes were not assigned to the preferred execution providers which may or may not have an negative impact on performance. e.g. ORT explicitly assigns shape related ops to CPU to improve perf.";
+    if (!is_verbose_mode) {
+      LOGS(logger, WARNING) << "Rerunning with verbose output on a non-minimal build will show node assignments.";
+    }
+  }
 
   return Status::OK();
 }
@@ -1214,10 +1231,10 @@ Status SessionState::FinalizeSessionState(const std::basic_string<PATH_CHAR_TYPE
   if (serialized_session_state) {
     ORT_RETURN_IF_ERROR(LoadFromOrtFormat(*serialized_session_state, kernel_registry_manager));
     // LoadFromOrtFormat() may assign node EPs so check afterwards
-    ORT_RETURN_IF_ERROR(VerifyEachNodeIsAssignedToAnEp(graph_, logger_));
+    ORT_RETURN_IF_ERROR(VerifyEachNodeIsAssignedToAnEp(graph_, logger_, execution_providers_));
   } else {
 #if !defined(ORT_MINIMAL_BUILD)
-    ORT_RETURN_IF_ERROR(VerifyEachNodeIsAssignedToAnEp(graph_, logger_));
+    ORT_RETURN_IF_ERROR(VerifyEachNodeIsAssignedToAnEp(graph_, logger_, execution_providers_));
     ORT_RETURN_IF_ERROR(PopulateKernelCreateInfo(kernel_registry_manager, saving_ort_format));
 #else
     ORT_UNUSED_PARAMETER(graph_location);
@@ -1419,12 +1436,12 @@ Status SessionState::FinalizeSessionStateImpl(const std::basic_string<PATH_CHAR_
                                                     subgraphs_kernel_create_info_maps,
                                                     outer_scope_node_arg_to_location_map,
                                                     ort_value_name_idx_map_, context, p_seq_exec_plan_));
-  // Record the allocation plan
+// Record the allocation plan
 
-  // Uncomment the below to dump the allocation plan to std::cout
-  // LOGS(logger_, VERBOSE) << std::make_pair(p_seq_exec_plan_.get(), this);
+// Uncomment the below to dump the allocation plan to std::cout
+// LOGS(logger_, VERBOSE) << std::make_pair(p_seq_exec_plan_.get(), this);
 #if !defined(ORT_MINIMAL_BUILD) && defined(ORT_MEMORY_PROFILE)
-  MemoryInfo::GenerateTensorMap(GetExecutionPlan(), GetOrtValueNameIdxMap());
+  GetMemoryProfiler()->Init(GetExecutionPlan(), GetOrtValueNameIdxMap());
 #endif
 
   // Memory pattern tracer allocates all initializers on a single contiguous
@@ -1452,18 +1469,36 @@ Status SessionState::FinalizeSessionStateImpl(const std::basic_string<PATH_CHAR_
   const auto& initializer_allocation_order = p_seq_exec_plan_->initializer_allocation_order;
 
   // move initializers from TensorProto instances in Graph to OrtValue instances in SessionState
+  session_state_utils::MemoryProfileFunction memory_profile_func = nullptr;
+#if !defined(ORT_MINIMAL_BUILD) && defined(ORT_MEMORY_PROFILE)
+  memory_profile_func = [this](ITensorAllocator& planner) {
+    GetMemoryProfiler()->GetMemoryInfo().RecordPatternInfo(
+        planner.GetMemPatterns(), MemoryInfo::MapType::Initializer);
+    GetMemoryProfiler()->CreateEvents(
+        "initializer_" + std::to_string(GetMemoryProfiler()->GetMemoryInfo().GetIteration()),
+        GetMemoryProfiler()->GetAndIncreasePid(), MemoryInfo::MapType::Initializer, "", 0);
+  };
+
+#endif
+
   ORT_RETURN_IF_ERROR(
       session_state_utils::SaveInitializedTensors(
           Env::Default(), graph_location, *graph_viewer_,
           execution_providers_.GetDefaultCpuAllocator(),
           ort_value_name_idx_map_, initializer_allocation_order, *tensor_allocator,
-          [this](int idx, const OrtValue& value, const OrtCallback& d, bool constant, bool sparse) -> Status {
-            return AddInitializedTensor(idx, value, &d, constant, sparse);
+          [this, remove_initializers](const std::string& name, int idx, const OrtValue& value, const OrtCallback& d,
+                                      bool constant, bool sparse) -> Status {
+            ORT_RETURN_IF_ERROR(AddInitializedTensor(idx, value, &d, constant, sparse));
+            if (remove_initializers) {
+              graph_.RemoveInitializedTensor(name);
+            }
+            return Status::OK();
           },
-          logger_, data_transfer_mgr_, *p_seq_exec_plan_, session_options));
+          logger_, data_transfer_mgr_, *p_seq_exec_plan_, session_options, memory_profile_func));
+
 #if !defined(ORT_MINIMAL_BUILD) && defined(ORT_MEMORY_PROFILE)
   // Record Weight allocation info on device
-  MemoryInfo::RecordInitializerAllocInfo(GetInitializedTensors());
+  GetMemoryProfiler()->GetMemoryInfo().RecordInitializerAllocInfo(GetInitializedTensors());
 #endif
 
   // remove weights from the graph now to save memory but in many cases it won't save memory, if the tensor was
