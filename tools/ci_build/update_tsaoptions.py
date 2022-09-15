@@ -13,6 +13,5 @@ buildNumber = os.getenv("BUILD_BUILDNUMBER")
 if buildNumber is not None:
     data["buildNumber"] = buildNumber
 
-
 with (REPO_DIR / ".config" / "tsaoptions.json").open() as f:
-    json.dumps(data, f)
+    json.dump(data, f)
