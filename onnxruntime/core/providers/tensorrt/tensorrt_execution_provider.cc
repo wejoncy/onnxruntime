@@ -9,6 +9,7 @@
 #include "core/common/safeint.h"
 #include "tensorrt_execution_provider.h"
 #include "tensorrt_execution_provider_utils.h"
+#include "core/framework/murmurhash3.h"
 #include "core/providers/cuda/shared_inc/cuda_call.h"
 #include "core/providers/cuda/math/unary_elementwise_ops_impl.h"
 #include "core/providers/cuda/gpu_data_transfer.h"
@@ -2119,5 +2120,112 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<FusedNodeAnd
     node_compute_funcs.push_back(compute_info);
   }
   return Status::OK();
+}
+
+int TensorrtExecutionProvider::ModelMetadefIdGenerator::GenerateId(const GraphViewer& graph_viewer,
+  HashValue& model_hash) {
+  model_hash = 0;
+
+  // find the top level graph
+  const Graph* cur_graph = &graph_viewer.GetGraph();
+  while (cur_graph->IsSubgraph()) {
+    cur_graph = cur_graph->ParentGraph();
+  }
+
+  uint32_t instance_hash[4] = { 0, 0, 0, 0 };
+
+  const Graph& main_graph = *cur_graph;
+
+  // hash the bytes in the Graph instance. we can't just use the address as a new Graph instance may use
+  // the same memory (unit tests prove this can occur). the raw bytes of the Graph instance should be a unique
+  // fingerprint for the instance that can use used as the key to the hash of the model path/contents.
+  //MurmurHash3::x86_128(&main_graph, gsl::narrow_cast<int32_t>(sizeof(Graph)), instance_hash[0], &instance_hash);
+  HashValue graph_instance_hash = instance_hash[0] | (uint64_t(instance_hash[1]) << 32);
+
+  // if we've already hashed this main graph instance use the cached value
+  auto entry = main_graph_hash_.find(graph_instance_hash);
+  if (entry != main_graph_hash_.cend()) {
+    model_hash = entry->second;
+  }
+  else {
+    uint32_t hash[4] = { 0, 0, 0, 0 };
+
+    // Use model name instead of path to avoid cache regeneration if path changes
+    // Question: Could model be created without model name?
+    const auto& model_name_str = main_graph.Name();
+    if (!model_name_str.empty()) {
+      MurmurHash3::x86_128(model_name_str.data(), gsl::narrow_cast<int32_t>(model_name_str.size()), hash[0], &hash);
+    }
+    std::cout << "Model Name: " << model_name_str.data() << std::endl;
+
+    auto hash_str = [&hash](const std::string& str) {
+      MurmurHash3::x86_128(str.data(), gsl::narrow_cast<int32_t>(str.size()), hash[0], &hash);
+      std::cout << str.data() << "->";
+    };
+
+    std::cout << "Hashing graph inputs and the ordered outputs from each node: " << std::endl;
+
+    //// fingerprint the main graph by hashing graph inputs
+    //for (const auto* node_arg : main_graph.GetInputsIncludingInitializers()) {
+    //  hash_str(node_arg->Name());
+    //}
+    std::cout << "<-Inputs " << std::endl;   
+    
+    const int number_of_ort_nodes = graph_viewer.NumberOfNodes();
+    std::vector<size_t> nodes_vector(number_of_ort_nodes);
+    std::iota(std::begin(nodes_vector), std::end(nodes_vector), 0);
+    const std::vector<NodeIndex>& node_index = graph_viewer.GetNodesInTopologicalOrder();
+    for (const auto& index : nodes_vector) {
+      const auto& node = graph_viewer.GetNode(node_index[index]);
+      for (const auto* node_arg : node->OutputDefs()) {
+        /*if (node_arg->Exists()) {
+          hash_str(node_arg->Name());
+        }*/
+      }
+    }
+    std::cout << "<-Outputs()" << std::endl;
+
+#ifdef __linux__
+    //hash_str("LINUX");
+    std::cout << "Linux Platform" << std::endl;
+#elif defined(_WIN32)
+    //hash_str("WINDOWS");
+    std::cout << "Windows Platform" << std::endl;
+#endif
+
+#ifdef ORT_VERSION
+    //hash_str(ORT_VERSION);
+    std::cout << "ORT " << ORT_VERSION << std::endl;
+#endif
+
+#ifdef CUDA_VERSION
+    //hash_str(std::to_string(CUDA_VERSION));
+    std::cout << "CUDA " << CUDA_VERSION << std::endl;
+#endif
+
+#if defined(NV_TENSORRT_MAJOR) && defined(NV_TENSORRT_MINOR)
+    std::string TRT_VERSION = std::to_string(NV_TENSORRT_MAJOR) + "." + std::to_string(NV_TENSORRT_MINOR);
+    //hash_str(TRT_VERSION);
+    std::cout << "TRT " << TRT_VERSION << std::endl;
+#endif
+
+    model_hash = hash[0] | (uint64_t(hash[1]) << 32);
+
+    main_graph_hash_[graph_instance_hash] = model_hash;
+    std::cout << "hash: " << model_hash << std::endl;
+  }
+
+  // return the current unique id, and increment to update
+  std::cout << "Current GPU id: " << GetDeviceId() << std::endl;
+  std::cout << "Current id: " << model_metadef_id_[model_hash] << std::endl;
+  return model_metadef_id_[model_hash]++;
+}
+
+int TensorrtExecutionProvider::GenerateMetaDefId(const GraphViewer& graph_viewer, HashValue& model_hash) const {
+  // if the EP is shared across multiple sessions there's a very small potential for concurrency issues.
+  // use a lock when generating an id to be paranoid
+  static OrtMutex mutex;
+  std::lock_guard<OrtMutex> lock(mutex);
+  return metadef_id_generator_->GenerateId(graph_viewer, model_hash);
 }
 }  // namespace onnxruntime
