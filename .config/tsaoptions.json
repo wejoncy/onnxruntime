@@ -1,7 +1,7 @@
 {
   "notificationAliases": ["chasun@microsoft.com"],
   "areaPath": "Vienna\\ONNX Runtime\\Shared Core",
-  "codebaseName": "onnxruntime_master",
+  "codebaseName": "onnxruntime_main",
   "instanceUrl": "https://msdata.visualstudio.com/",
   "projectName": "Vienna",
   "ignoreBranchName": true
