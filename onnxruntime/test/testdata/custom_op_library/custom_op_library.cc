@@ -16,7 +16,7 @@ template <typename T1, typename T2, typename T3>
 void cuda_add(int64_t, T3*, const T1*, const T2*, cudaStream_t compute_stream);
 #endif
 
-static constexpr char* c_OpDomain = "test.customop";
+static const char* c_OpDomain = "test.customop";
 
 struct KernelOne {
 
