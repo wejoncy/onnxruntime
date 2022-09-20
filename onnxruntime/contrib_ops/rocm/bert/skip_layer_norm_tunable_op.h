@@ -43,24 +43,22 @@ template <typename T, int ThreadsPerBlock, int VecSize>
 Status SkipLayerNormSmallOp(const SkipLayerNormParams<T>* params) {
   TUNABLE_OP_RETURN_UNSUPPOTED_ARGUMENT_IF(
       !((params->ld <= 1024 && params->ld % VecSize == 0 && params->ld == ThreadsPerBlock * VecSize)));
-  hipLaunchKernelGGL((SkipLayerNormKernelSmall<T, ThreadsPerBlock, VecSize>),
-                     dim3(CeilingDivision(params->element_count, params->ld)),
-                     dim3(ThreadsPerBlock),
-                     0, params->stream, params->ld, params->input, params->skip,
-                     params->beta, params->gamma, params->bias, maybe2half<T>(params->epsilon), params->output,
-                     (params->bias == nullptr) ? false : true);
-  auto status = hipGetLastError();
-  ORT_RETURN_IF(status != hipSuccess, ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, hipGetErrorName(status)));
-  return Status::OK();
+  SkipLayerNormKernelSmall<T, ThreadsPerBlock, VecSize><<<dim3(CeilingDivision(params->element_count, params->ld)),
+                                                          dim3(ThreadsPerBlock),
+                                                          0, params->stream>>>(
+      params->ld, params->input, params->skip,
+      params->beta, params->gamma, params->bias, maybe2half<T>(params->epsilon), params->output,
+      (params->bias == nullptr) ? false : true);
+  return HIP_CALL(hipGetLastError());
 }
 
 template <typename T, int ThreadsPerBlock, int VecSize>
 Status SkipLayerNormRegularOp(const SkipLayerNormParams<T>* params) {
   TUNABLE_OP_RETURN_UNSUPPOTED_ARGUMENT_IF(
       !((params->ld > 0 && params->ld % VecSize == 0 && params->ld >= ThreadsPerBlock * VecSize)));
-    SkipLayerNormKernelSmall<T, ThreadsPerBlock, VecSize><<<dim3(CeilingDivision(params->element_count, params->ld)),
-                                                          dim3(ThreadsPerBlock),
-                                                          0, params->stream>>>(
+  SkipLayerNormKernelVec<T, ThreadsPerBlock, VecSize>)<<<dim3(CeilingDivision(params->element_count, params->ld)),
+                                                         dim3(ThreadsPerBlock),
+                                                         0, params->stream>>>(
       params->ld, params->input, params->skip,
       params->beta, params->gamma, params->bias, maybe2half<T>(params->epsilon), params->output,
       (params->bias == nullptr) ? false : true);
