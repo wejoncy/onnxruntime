@@ -5432,7 +5432,7 @@ TEST_F(GraphTransformationTests, ConstantSharing_DivMul) {
 TEST_F(GraphTransformationTests, ConstantSharing_INTMAX_AND_Infinity) {
   auto pre_graph_checker = [&](Graph& graph) {
     auto op_count_pre = CountOpsInGraph(graph);
-    ASSERT_EQ(op_count_pre.size(), 2U);
+    ASSERT_EQ(op_count_pre.size(), 4U);
     ASSERT_EQ(op_count_pre["Div"], 1);
     ASSERT_EQ(op_count_pre["Mul"], 12);
     ASSERT_EQ(op_count_pre["Sub"], 12);
@@ -5465,23 +5465,21 @@ TEST_F(GraphTransformationTests, ConstantSharing_INTMAX_AND_Infinity) {
     for (const auto& entry : initialized_tensor_set) {
       if (entry.first.compare(mul_initializer->Name()) == 0) {
         const ONNX_NAMESPACE::TensorProto* tensor_proto = entry.second;
-        int32_t data_type = tensor_proto->data_type();
+        onnxruntime::Initializer int64_const{*tensor_proto, graph.ModelPath()};
+        ASSERT_EQ(int64_const.size(), 1);
+        int64_t int64_const_value = *(int64_const.data<int64_t>());
+        ASSERT_EQ(int64_const_value, std::numeric_limits<int64_t>::max());
+      } else if (entry.first.compare(sub_initializer->Name()) == 0) {
+        const ONNX_NAMESPACE::TensorProto* tensor_proto = entry.second;
         onnxruntime::Initializer float_const{*tensor_proto, graph.ModelPath()};
         ASSERT_EQ(float_const.size(), 1);
         float float_const_value = *(float_const.data<float>());
         ASSERT_EQ(float_const_value, std::numeric_limits<float>::infinity());
-      } else if (entry.first.compare(sub_initializer->Name()) == 0) {
-        const ONNX_NAMESPACE::TensorProto* tensor_proto = entry.second;
-        int32_t data_type = tensor_proto->data_type();
-        onnxruntime::Initializer int64_const{*tensor_proto, graph.ModelPath()};
-        ASSERT_EQ(int64_const.size(), 1);
-        float int64_const_value = *(int64_const.data<int64_t>());
-        ASSERT_EQ(int64_const_value, std::numeric_limits<int64_t>::max());
       }
     }
 
     auto op_count = CountOpsInGraph(graph);
-    ASSERT_EQ(op_count.size(), 2U);
+    ASSERT_EQ(op_count.size(), 4U);
     ASSERT_EQ(op_count["Div"], 1);
     ASSERT_EQ(op_count["Mul"], 12);
     ASSERT_EQ(op_count["Sub"], 12);
