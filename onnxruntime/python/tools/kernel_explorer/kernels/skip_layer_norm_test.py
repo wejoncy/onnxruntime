@@ -110,9 +110,8 @@ def profile_skip_layer_norm_func(batch_size, seq_len, hidden_size, dtype, func):
 
 
 def profile():
-    bert_sizes = get_bert_sizes()
     for dtype in dtypes:
-        for bert_size in bert_sizes:
+        for bert_size in get_bert_sizes():
             for func in dtype_to_funcs(dtype):
                 profile_skip_layer_norm_func(*bert_size, dtype, func)
             print()

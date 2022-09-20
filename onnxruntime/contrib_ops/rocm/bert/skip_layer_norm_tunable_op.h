@@ -19,10 +19,9 @@ template <typename T>
 struct SkipLayerNormParams : OpParams {
   SkipLayerNormParams(hipStream_t stream, T* output, const T* input,
                       const T* skip, const T* gamma, const T* beta,
-                      const T* bias, float epsilon, const int ld,
-                      const int element_count)
-      : OpParams(stream), output(output), input(input), skip(skip), gamma(gamma), beta(beta),
-        bias(bias), epsilon(epsilon), ld(ld), element_count(element_count) {}
+                      const T* bias, float epsilon, int ld, int element_count)
+      : OpParams(stream), output(output), input(input), skip(skip), gamma(gamma), beta(beta), bias(bias),
+        epsilon(epsilon), ld(ld), element_count(element_count) {}
 
   std::string Signature() const override {
     std::string sig = std::to_string(ld) + "_" + std::to_string(element_count);
@@ -35,9 +34,9 @@ struct SkipLayerNormParams : OpParams {
   const T* gamma;
   const T* beta;
   const T* bias;
-  const float epsilon;
-  const int ld;
-  const int element_count;
+  float epsilon;
+  int ld;
+  int element_count;
 };
 
 template <typename T, int ThreadsPerBlock, int VecSize>
@@ -64,7 +63,6 @@ template <typename T>
 class SkipLayerNormTunableOp : public TunableOp<SkipLayerNormParams<T>> {
  public:
   SkipLayerNormTunableOp() {
-    ADD_OP(32)
     ADD_OP(64)
     ADD_OP(128)
     ADD_OP(192)
