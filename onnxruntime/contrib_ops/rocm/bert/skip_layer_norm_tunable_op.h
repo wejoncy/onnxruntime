@@ -56,9 +56,9 @@ template <typename T, int ThreadsPerBlock, int VecSize>
 Status SkipLayerNormRegularOp(const SkipLayerNormParams<T>* params) {
   TUNABLE_OP_RETURN_UNSUPPOTED_ARGUMENT_IF(
       !((params->ld > 0 && params->ld % VecSize == 0 && params->ld >= ThreadsPerBlock * VecSize)));
-  SkipLayerNormKernelVec<T, ThreadsPerBlock, VecSize>)<<<dim3(CeilingDivision(params->element_count, params->ld)),
-                                                         dim3(ThreadsPerBlock),
-                                                         0, params->stream>>>(
+  SkipLayerNormKernelVec<T, ThreadsPerBlock, VecSize><<<dim3(CeilingDivision(params->element_count, params->ld)),
+                                                        dim3(ThreadsPerBlock),
+                                                        0, params->stream>>>(
       params->ld, params->input, params->skip,
       params->beta, params->gamma, params->bias, maybe2half<T>(params->epsilon), params->output,
       (params->bias == nullptr) ? false : true);
@@ -87,8 +87,8 @@ class SkipLayerNormTunableOp : public TunableOp<SkipLayerNormParams<T>> {
     ADD_OP_FOR_ALL_THREADS_PER_BLOCK_ALL_VEC_SIZE(SkipLayerNormSmallOp)
     ADD_OP_FOR_ALL_THREADS_PER_BLOCK_ALL_VEC_SIZE(SkipLayerNormRegularOp)
 
-    // NOTE: the 3-th kernel seems to be better in gerenal case, so set it as default one
-    this->SetDefaultId(3);
+    // NOTE: the 30-th kernel is SkipLayerNormRegularOp ThreadsPerBlock=64 VecSize=1
+    this->SetDefaultId(30);
   }
 };
 
