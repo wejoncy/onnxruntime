@@ -3,6 +3,7 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
+import re
 from itertools import product
 
 import kernel_explorer as ke
